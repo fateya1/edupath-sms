@@ -1,0 +1,486 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  PRINCIPAL
+  DEPUTY_PRINCIPAL
+  TEACHER
+  STUDENT
+  PARENT
+  ACCOUNTANT
+  LIBRARIAN
+  RECEPTIONIST
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum Pathway {
+  STEM
+  SOCIAL_SCIENCES
+  ARTS_SPORTS
+}
+
+enum STEMTrack {
+  PURE_SCIENCES
+  APPLIED_SCIENCES
+  TECHNICAL_STUDIES
+}
+
+enum SocialSciencesTrack {
+  HUMANITIES
+  LANGUAGES
+  BUSINESS_STUDIES
+}
+
+enum ArtsSportsTrack {
+  ARTS
+  SPORTS_SCIENCE
+}
+
+enum StudentStatus {
+  ACTIVE
+  SUSPENDED
+  EXPELLED
+  GRADUATED
+  TRANSFERRED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum GradeLevel {
+  GRADE_10
+  GRADE_11
+  GRADE_12
+}
+
+enum Term {
+  TERM_1
+  TERM_2
+  TERM_3
+}
+
+enum CompetencyLevel {
+  EXCEEDS_EXPECTATIONS
+  MEETS_EXPECTATIONS
+  APPROACHES_EXPECTATIONS
+  BELOW_EXPECTATIONS
+}
+
+// Models
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  role          UserRole
+  firstName     String
+  lastName      String
+  phoneNumber   String?
+  isActive      Boolean   @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  student       Student?
+  teacher       Teacher?
+  parent        Parent?
+  
+  @@map("users")
+}
+
+model Student {
+  id                String        @id @default(uuid())
+  userId            String        @unique
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  admissionNumber   String        @unique
+  upiNumber         String?       @unique
+  indexNumber       String?       @unique
+  
+  dateOfBirth       DateTime
+  gender            Gender
+  nationalId        String?
+  birthCertNumber   String?
+  
+  pathway           Pathway
+  stemTrack         STEMTrack?
+  socialTrack       SocialSciencesTrack?
+  artsTrack         ArtsSportsTrack?
+  
+  gradeLevel        GradeLevel
+  status            StudentStatus @default(ACTIVE)
+  
+  // Address
+  county            String
+  subCounty         String?
+  ward              String?
+  village           String?
+  
+  // Medical
+  bloodGroup        String?
+  allergies         String?
+  medicalConditions String?
+  
+  // Islamic Education
+  muslimName        String?
+  quranLevel        String?
+  
+  admissionDate     DateTime      @default(now())
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  // Relations
+  parents           StudentParent[]
+  class             Class?          @relation(fields: [classId], references: [id])
+  classId           String?
+  subjects          StudentSubject[]
+  attendance        Attendance[]
+  assessments       Assessment[]
+  feeRecords        FeeRecord[]
+  disciplineRecords DisciplineRecord[]
+  
+  @@map("students")
+}
+
+model Parent {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  nationalId      String?   @unique
+  occupation      String?
+  employer        String?
+  officePhone     String?
+  
+  // Address
+  county          String?
+  subCounty       String?
+  residentialArea String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  students        StudentParent[]
+  
+  @@map("parents")
+}
+
+model StudentParent {
+  id              String   @id @default(uuid())
+  studentId       String
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  parentId        String
+  parent          Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  
+  relationship    String   // Father, Mother, Guardian, etc.
+  isPrimary       Boolean  @default(false)
+  
+  createdAt       DateTime @default(now())
+  
+  @@unique([studentId, parentId])
+  @@map("student_parents")
+}
+
+model Teacher {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  employeeNumber  String    @unique
+  tscNumber       String?   @unique
+  nationalId      String?   @unique
+  
+  dateOfBirth     DateTime?
+  gender          Gender
+  
+  qualification   String?
+  specialization  String?
+  dateOfJoining   DateTime
+  
+  // Address
+  county          String?
+  subCounty       String?
+  residentialArea String?
+  
+  isClassTeacher  Boolean   @default(false)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  subjects        TeacherSubject[]
+  classes         Class[]          @relation("ClassTeacher")
+  attendance      TeacherAttendance[]
+  
+  @@map("teachers")
+}
+
+model Class {
+  id              String     @id @default(uuid())
+  name            String     @unique
+  gradeLevel      GradeLevel
+  pathway         Pathway
+  stream          String?
+  capacity        Int        @default(40)
+  
+  classTeacherId  String?
+  classTeacher    Teacher?   @relation("ClassTeacher", fields: [classTeacherId], references: [id])
+  
+  academicYear    Int
+  isActive        Boolean    @default(true)
+  
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  
+  // Relations
+  students        Student[]
+  subjects        ClassSubject[]
+  timetable       TimetableSlot[]
+  
+  @@map("classes")
+}
+
+model Subject {
+  id              String    @id @default(uuid())
+  name            String    @unique
+  code            String    @unique
+  description     String?
+  
+  isCompulsory    Boolean   @default(false)
+  pathway         Pathway?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  classes         ClassSubject[]
+  teachers        TeacherSubject[]
+  students        StudentSubject[]
+  assessments     Assessment[]
+  
+  @@map("subjects")
+}
+
+model ClassSubject {
+  id              String   @id @default(uuid())
+  classId         String
+  class           Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId       String
+  subject         Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  
+  periodsPerWeek  Int      @default(5)
+  
+  createdAt       DateTime @default(now())
+  
+  @@unique([classId, subjectId])
+  @@map("class_subjects")
+}
+
+model TeacherSubject {
+  id              String   @id @default(uuid())
+  teacherId       String
+  teacher         Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subjectId       String
+  subject         Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  
+  @@unique([teacherId, subjectId])
+  @@map("teacher_subjects")
+}
+
+model StudentSubject {
+  id              String   @id @default(uuid())
+  studentId       String
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId       String
+  subject         Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  
+  academicYear    Int
+  
+  createdAt       DateTime @default(now())
+  
+  @@unique([studentId, subjectId, academicYear])
+  @@map("student_subjects")
+}
+
+model TimetableSlot {
+  id              String   @id @default(uuid())
+  classId         String
+  class           Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  
+  dayOfWeek       Int      // 1-5 (Monday-Friday)
+  periodNumber    Int      // 1-8
+  startTime       String
+  endTime         String
+  
+  subjectId       String?
+  teacherId       String?
+  room            String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([classId, dayOfWeek, periodNumber])
+  @@map("timetable_slots")
+}
+
+model Attendance {
+  id              String           @id @default(uuid())
+  studentId       String
+  student         Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  date            DateTime         @db.Date
+  status          AttendanceStatus
+  remarks         String?
+  
+  markedBy        String?
+  markedAt        DateTime         @default(now())
+  
+  @@unique([studentId, date])
+  @@map("attendance")
+}
+
+model TeacherAttendance {
+  id              String           @id @default(uuid())
+  teacherId       String
+  teacher         Teacher          @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  
+  date            DateTime         @db.Date
+  status          AttendanceStatus
+  remarks         String?
+  
+  markedAt        DateTime         @default(now())
+  
+  @@unique([teacherId, date])
+  @@map("teacher_attendance")
+}
+
+model Assessment {
+  id              String          @id @default(uuid())
+  studentId       String
+  student         Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId       String
+  subject         Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  
+  academicYear    Int
+  term            Term
+  assessmentType  String          // Formative, Summative, Mock, Final
+  
+  score           Float
+  maxScore        Float           @default(100)
+  competencyLevel CompetencyLevel?
+  
+  remarks         String?
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  @@map("assessments")
+}
+
+model FeeStructure {
+  id              String   @id @default(uuid())
+  academicYear    Int
+  term            Term
+  gradeLevel      GradeLevel
+  
+  tuitionFee      Float
+  activityFee     Float?
+  examFee         Float?
+  developmentFee  Float?
+  otherFees       Float?
+  
+  totalAmount     Float
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([academicYear, term, gradeLevel])
+  @@map("fee_structures")
+}
+
+model FeeRecord {
+  id              String   @id @default(uuid())
+  studentId       String
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  academicYear    Int
+  term            Term
+  
+  totalFee        Float
+  amountPaid      Float    @default(0)
+  balance         Float
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  payments        Payment[]
+  
+  @@unique([studentId, academicYear, term])
+  @@map("fee_records")
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  feeRecordId     String
+  feeRecord       FeeRecord @relation(fields: [feeRecordId], references: [id], onDelete: Cascade)
+  
+  amount          Float
+  paymentMethod   String   // M-Pesa, Cash, Bank, Cheque
+  transactionRef  String?  @unique
+  
+  paymentDate     DateTime @default(now())
+  receivedBy      String?
+  
+  remarks         String?
+  
+  createdAt       DateTime @default(now())
+  
+  @@map("payments")
+}
+
+model DisciplineRecord {
+  id              String   @id @default(uuid())
+  studentId       String
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  incidentDate    DateTime @default(now())
+  incidentType    String
+  description     String
+  severity        String   // Minor, Major, Serious
+  
+  action          String?
+  actionDate      DateTime?
+  
+  reportedBy      String
+  resolvedBy      String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("discipline_records")
+}
