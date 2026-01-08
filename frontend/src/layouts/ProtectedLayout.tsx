@@ -3,6 +3,8 @@ import { useAuth } from "../context/AuthContext";
 
 export default function ProtectedLayout() {
   const { token } = useAuth();
-  if (!token) return <Navigate to="/login" replace />;
+  const isAuthenticated = !!token;
+
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <Outlet />;
 }

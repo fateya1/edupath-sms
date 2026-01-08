@@ -1,63 +1,49 @@
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
-type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+type LoginResponse = {
+  access_token: string;
+  user: { email: string; role?: string };
+};
 
-async function request<T>(
-  path: string,
-  options: {
-    method?: HttpMethod;
-    body?: unknown;
-    token?: string | null;
-  } = {}
-): Promise<T> {
-  const { method = "GET", body, token } = options;
-
-  const res = await fetch(`${API_URL}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  // handle errors nicely
+async function http<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init);
   if (!res.ok) {
-    let message = `Request failed (${res.status})`;
-    try {
-      const data = await res.json();
-      message = data?.message?.toString?.() || message;
-    } catch {}
-    throw new Error(message);
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `Request failed (${res.status})`);
   }
-
-  // if no content
-  if (res.status === 204) return null as T;
-
-  return (await res.json()) as T;
+  return res.json() as Promise<T>;
 }
 
 export const api = {
-  // Auth
-  login: (email: string, password: string) =>
-    request<{ access_token: string; user: { email: string; role?: string } }>(
-      "/auth/login",
-      { method: "POST", body: { email, password } }
-    ),
-
-  // Students (adjust endpoints to match your backend)
-  getStudents: (token: string) =>
-    request<Array<{ id: number; name: string; grade: string }>>("/students", {
-      token,
-    }),
-
-  createStudent: (token: string, payload: { name: string; grade: string }) =>
-    request<{ id: number; name: string; grade: string }>("/students", {
+  login(email: string, password: string) {
+    return http<LoginResponse>(`${API_URL}/auth/login`, {
       method: "POST",
-      token,
-      body: payload,
-    }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+  },
 
-  deleteStudent: (token: string, id: number) =>
-    request<void>(`/students/${id}`, { method: "DELETE", token }),
+  getStudents(token: string) {
+    return http<Array<{ id: number; name: string; grade: string }>>(`${API_URL}/students`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  },
+
+  createStudent(token: string, payload: { name: string; grade: string }) {
+    return http<{ id: number; name: string; grade: string }>(`${API_URL}/students`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+  },
+
+  deleteStudent(token: string, id: number) {
+    return http<void>(`${API_URL}/students/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
 };

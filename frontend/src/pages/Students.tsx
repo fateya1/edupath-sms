@@ -6,34 +6,32 @@ export default function Students() {
 
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const canAdd = useMemo(
-    () => name.trim().length > 0 && grade.trim().length > 0 && !loading,
-    [name, grade, loading]
-  );
+  const canAdd = useMemo(() => {
+    return name.trim().length > 0 && grade.trim().length > 0;
+  }, [name, grade]);
 
   async function onAdd() {
-    if (!canAdd) return;
-    setError(null);
+    if (!canAdd || submitting) return;
+
     try {
+      setSubmitting(true);
       await addStudent(name.trim(), grade.trim());
       setName("");
       setGrade("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to add student");
+    } finally {
+      setSubmitting(false);
     }
+  }
+
+  async function onRemove(id: number) {
+    await removeStudent(id);
   }
 
   return (
     <div style={{ maxWidth: 720, margin: "30px auto" }}>
       <h2>Students</h2>
-
-      {error && (
-        <div style={{ background: "#ffe6e6", padding: 10, borderRadius: 8, marginBottom: 12 }}>
-          {error}
-        </div>
-      )}
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         <input
@@ -42,23 +40,36 @@ export default function Students() {
           onChange={(e) => setName(e.target.value)}
           style={{ flex: 1, padding: 10 }}
         />
+
         <input
           placeholder="Grade"
           value={grade}
           onChange={(e) => setGrade(e.target.value)}
           style={{ width: 140, padding: 10 }}
         />
-        <button onClick={onAdd} disabled={!canAdd} style={{ padding: "10px 14px" }}>
-          {loading ? "..." : "Add"}
+
+        <button
+          onClick={onAdd}
+          disabled={!canAdd || submitting}
+          style={{ padding: "10px 14px" }}
+        >
+          {submitting ? "Adding..." : "Add"}
         </button>
-        <button onClick={resetStudents} disabled={loading} style={{ padding: "10px 14px" }}>
-          Reset
+
+        <button
+          onClick={resetStudents}
+          disabled={loading}
+          style={{ padding: "10px 14px" }}
+        >
+          {loading ? "Refreshing..." : "Refresh"}
         </button>
       </div>
 
-      <div style={{ border: "1px solid #ddd", borderRadius: 10 }}>
-        {students.length === 0 ? (
-          <div style={{ padding: 14 }}>{loading ? "Loading..." : "No students yet."}</div>
+      <div style={{ border: "1px solid #ddd", borderRadius: 10, overflow: "hidden" }}>
+        {loading ? (
+          <div style={{ padding: 14 }}>Loading...</div>
+        ) : students.length === 0 ? (
+          <div style={{ padding: 14 }}>No students yet.</div>
         ) : (
           students.map((s, idx) => (
             <div
@@ -74,7 +85,8 @@ export default function Students() {
                 <div style={{ fontWeight: 600 }}>{s.name}</div>
                 <div style={{ opacity: 0.8 }}>Grade: {s.grade}</div>
               </div>
-              <button onClick={() => removeStudent(s.id)} style={{ padding: "8px 12px" }}>
+
+              <button onClick={() => onRemove(s.id)} style={{ padding: "8px 12px" }}>
                 Remove
               </button>
             </div>
