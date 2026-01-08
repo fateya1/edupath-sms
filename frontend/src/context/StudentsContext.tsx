@@ -1,45 +1,65 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { api } from "../lib/api";
+import { useAuth } from "./AuthContext";
 
-export type Student = {
-  id: number;
-  name: string;
-  grade: string;
-};
+export type Student = { id: number; name: string; grade: string };
 
 type StudentsContextValue = {
   students: Student[];
-  addStudent: (name: string, grade: string) => void;
-  removeStudent: (id: number) => void;
-  resetStudents: () => void;
+  loading: boolean;
+  refresh: () => Promise<void>;
+  addStudent: (name: string, grade: string) => Promise<void>;
+  removeStudent: (id: number) => Promise<void>;
+  resetStudents: () => Promise<void>;
 };
 
 const StudentsContext = createContext<StudentsContextValue | undefined>(undefined);
 
-const seed: Student[] = [
-  { id: 1, name: "Amina Hassan", grade: "Form 2" },
-  { id: 2, name: "Brian Otieno", grade: "Form 1" },
-  { id: 3, name: "Cynthia Wanjiru", grade: "Form 4" },
-];
-
 export function StudentsProvider({ children }: { children: React.ReactNode }) {
-  const [students, setStudents] = useState<Student[]>(seed);
+  const { token } = useAuth();
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const addStudent = (name: string, grade: string) => {
-    setStudents((prev) => {
-      const nextId = prev.length ? Math.max(...prev.map((s) => s.id)) + 1 : 1;
-      return [...prev, { id: nextId, name, grade }];
-    });
-  };
+  async function refresh() {
+    if (!token) {
+      setStudents([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await api.getStudents(token);
+      setStudents(data);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  const removeStudent = (id: number) => {
+  useEffect(() => {
+    // load students when token exists
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  async function addStudent(name: string, grade: string) {
+    if (!token) throw new Error("Not authenticated");
+    const created = await api.createStudent(token, { name, grade });
+    setStudents((prev) => [created, ...prev]);
+  }
+
+  async function removeStudent(id: number) {
+    if (!token) throw new Error("Not authenticated");
+    await api.deleteStudent(token, id);
     setStudents((prev) => prev.filter((s) => s.id !== id));
-  };
+  }
 
-  const resetStudents = () => setStudents(seed);
+  async function resetStudents() {
+    // If you don’t have backend reset endpoint, we can just refresh:
+    await refresh();
+  }
 
   const value = useMemo(
-    () => ({ students, addStudent, removeStudent, resetStudents }),
-    [students]
+    () => ({ students, loading, refresh, addStudent, removeStudent, resetStudents }),
+    [students, loading]
   );
 
   return <StudentsContext.Provider value={value}>{children}</StudentsContext.Provider>;
