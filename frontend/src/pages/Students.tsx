@@ -4,7 +4,7 @@ import { useStudents } from "../context/StudentsContext";
 const grades = ["Form 1", "Form 2", "Form 3", "Form 4"];
 
 export default function Students() {
-  const { students, addStudent, removeStudent, resetStudents } = useStudents();
+ const { students, addStudent, removeStudent, loading, refresh } = useStudents();
 
   const [name, setName] = useState("");
   const [grade, setGrade] = useState(grades[0]);
