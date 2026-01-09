@@ -1,0 +1,176 @@
+[1mdiff --git a/backend/package.json b/backend/package.json[m
+[1mindex 8214724..c12784b 100644[m
+[1m--- a/backend/package.json[m
+[1m+++ b/backend/package.json[m
+[36m@@ -17,11 +17,16 @@[m
+     "@nestjs/common": "^10.3.0",[m
+     "@nestjs/config": "^3.2.0",[m
+     "@nestjs/core": "^10.3.0",[m
+[32m+[m[32m    "@nestjs/jwt": "^11.0.2",[m
+[32m+[m[32m    "@nestjs/passport": "^11.0.5",[m
+     "@nestjs/platform-express": "^10.3.0",[m
+     "@prisma/client": "^5.18.0",[m
+[32m+[m[32m    "bcrypt": "^6.0.0",[m
+     "class-transformer": "^0.5.1",[m
+     "class-validator": "^0.14.1",[m
+     "dotenv": "^16.4.5",[m
+[32m+[m[32m    "passport": "^0.7.0",[m
+[32m+[m[32m    "passport-jwt": "^4.0.1",[m
+     "reflect-metadata": "^0.2.2",[m
+     "rxjs": "^7.8.1"[m
+   },[m
+[36m@@ -29,7 +34,9 @@[m
+     "@nestjs/cli": "^10.4.2",[m
+     "@nestjs/schematics": "^10.1.2",[m
+     "@nestjs/testing": "^10.3.0",[m
+[32m+[m[32m    "@types/bcrypt": "^6.0.0",[m
+     "@types/node": "^20.14.10",[m
+[32m+[m[32m    "@types/passport-jwt": "^4.0.1",[m
+     "@typescript-eslint/eslint-plugin": "^7.16.1",[m
+     "@typescript-eslint/parser": "^7.16.1",[m
+     "eslint": "^8.57.0",[m
+[1mdiff --git a/backend/prisma/src/prisma/auth/auth.module.ts b/backend/prisma/src/prisma/auth/auth.module.ts[m
+[1mdeleted file mode 100644[m
+[1mindex 21ff766..0000000[m
+[1m--- a/backend/prisma/src/prisma/auth/auth.module.ts[m
+[1m+++ /dev/null[m
+[36m@@ -1,29 +0,0 @@[m
+[31m-import { Module } from '@nestjs/common';[m
+[31m-import { JwtModule } from '@nestjs/jwt';[m
+[31m-import { PassportModule } from '@nestjs/passport';[m
+[31m-import { ConfigModule, ConfigService } from '@nestjs/config';[m
+[31m-import { AuthService } from './auth.service';[m
+[31m-import { AuthController } from './auth.controller';[m
+[31m-import { JwtStrategy } from './strategies/jwt.strategy';[m
+[31m-import { UsersModule } from '../users/users.module';[m
+[31m-[m
+[31m-@Module({[m
+[31m-  imports: [[m
+[31m-    UsersModule,[m
+[31m-    PassportModule.register({ defaultStrategy: 'jwt' }),[m
+[31m-    JwtModule.registerAsync({[m
+[31m-      imports: [ConfigModule],[m
+[31m-      useFactory: async (configService: ConfigService) => ({[m
+[31m-        secret: configService.get<string>('JWT_SECRET'),[m
+[31m-        signOptions: {[m
+[31m-          expiresIn: configService.get<string>('JWT_EXPIRES_IN') || '7d',[m
+[31m-        },[m
+[31m-      }),[m
+[31m-      inject: [ConfigService],[m
+[31m-    }),[m
+[31m-  ],[m
+[31m-  controllers: [AuthController],[m
+[31m-  providers: [AuthService, JwtStrategy],[m
+[31m-  exports: [AuthService, JwtModule, PassportModule],[m
+[31m-})[m
+[31m-export class AuthModule {}[m
+[1mdiff --git a/backend/prisma/src/prisma/auth/auth.service.ts b/backend/prisma/src/prisma/auth/auth.service.ts[m
+[1mdeleted file mode 100644[m
+[1mindex 18d3549..0000000[m
+[1m--- a/backend/prisma/src/prisma/auth/auth.service.ts[m
+[1m+++ /dev/null[m
+[36m@@ -1,68 +0,0 @@[m
+[31m-import { Injectable, UnauthorizedException } from '@nestjs/common';[m
+[31m-import { JwtService } from '@nestjs/jwt';[m
+[31m-import * as bcrypt from 'bcrypt';[m
+[31m-import { UsersService } from '../users/users.service';[m
+[31m-import { LoginDto } from './dto/login.dto';[m
+[31m-[m
+[31m-@Injectable()[m
+[31m-export class AuthService {[m
+[31m-  constructor([m
+[31m-    private usersService: UsersService,[m
+[31m-    private jwtService: JwtService,[m
+[31m-  ) {}[m
+[31m-[m
+[31m-  async validateUser(email: string, password: string): Promise<any> {[m
+[31m-    const user = await this.usersService.findByEmail(email);[m
+[31m-    [m
+[31m-    if (!user) {[m
+[31m-      throw new UnauthorizedException('Invalid credentials');[m
+[31m-    }[m
+[31m-[m
+[31m-    const isPasswordValid = await bcrypt.compare(password, user.password);[m
+[31m-    [m
+[31m-    if (!isPasswordValid) {[m
+[31m-      throw new UnauthorizedException('Invalid credentials');[m
+[31m-    }[m
+[31m-[m
+[31m-    if (!user.isActive) {[m
+[31m-      throw new UnauthorizedException('Account is deactivated');[m
+[31m-    }[m
+[31m-[m
+[31m-    // Remove password from response[m
+[31m-    const { password: _, ...result } = user;[m
+[31m-    return result;[m
+[31m-  }[m
+[31m-[m
+[31m-  async login(loginDto: LoginDto) {[m
+[31m-    const user = await this.validateUser(loginDto.email, loginDto.password);[m
+[31m-[m
+[31m-    const payload = {[m
+[31m-      sub: user.id,[m
+[31m-      email: user.email,[m
+[31m-      role: user.role,[m
+[31m-    };[m
+[31m-[m
+[31m-    // Update last login[m
+[31m-    await this.usersService.updateLastLogin(user.id);[m
+[31m-[m
+[31m-    return {[m
+[31m-      access_token: this.jwtService.sign(payload),[m
+[31m-      user: {[m
+[31m-        id: user.id,[m
+[31m-        email: user.email,[m
+[31m-        firstName: user.firstName,[m
+[31m-        lastName: user.lastName,[m
+[31m-        role: user.role,[m
+[31m-      },[m
+[31m-    };[m
+[31m-  }[m
+[31m-[m
+[31m-  async verifyToken(token: string) {[m
+[31m-    try {[m
+[31m-      const payload = this.jwtService.verify(token);[m
+[31m-      return payload;[m
+[31m-    } catch (error) {[m
+[31m-      throw new UnauthorizedException('Invalid token');[m
+[31m-    }[m
+[31m-  }[m
+[31m-}[m
+[1mdiff --git a/backend/prisma/src/prisma/prisma.module.ts b/backend/prisma/src/prisma/prisma.module.ts[m
+[1mdeleted file mode 100644[m
+[1mindex 23c626e..0000000[m
+[1m--- a/backend/prisma/src/prisma/prisma.module.ts[m
+[1m+++ /dev/null[m
+[36m@@ -1,9 +0,0 @@[m
+[31m-import { Module, Global } from '@nestjs/common';[m
+[31m-import { PrismaService } from './prisma.service';[m
+[31m-[m
+[31m-@Global()[m
+[31m-@Module({[m
+[31m-  providers: [PrismaService],[m
+[31m-  exports: [PrismaService],[m
+[31m-})[m
+[31m-export class PrismaModule {}[m
+[1mdiff --git a/backend/prisma/src/prisma/prisma.service.ts b/backend/prisma/src/prisma/prisma.service.ts[m
+[1mdeleted file mode 100644[m
+[1mindex 10fdd5b..0000000[m
+[1m--- a/backend/prisma/src/prisma/prisma.service.ts[m
+[1m+++ /dev/null[m
+[36m@@ -1,15 +0,0 @@[m
+[31m-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';[m
+[31m-import { PrismaClient } from '@prisma/client';[m
+[31m-[m
+[31m-@Injectable()[m
+[31m-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {[m
+[31m-  async onModuleInit() {[m
+[31m-    await this.$connect();[m
+[31m-    console.log('✅ Database connected successfully');[m
+[31m-  }[m
+[31m-[m
+[31m-  async onModuleDestroy() {[m
+[31m-    await this.$disconnect();[m
+[31m-    console.log('❌ Database disconnected');[m
+[31m-  }[m
+[31m-}[m
