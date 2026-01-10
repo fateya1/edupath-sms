@@ -8,6 +8,12 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Students from "./pages/Students";
 import NotAuthorized from "./pages/NotAuthorized";
+import { useEffect } from "react";
+import { warmUpBackend } from "./services/warmup";
+
+useEffect(() => {
+  warmUpBackend();
+}, []);
 
 export default function App() {
   return (

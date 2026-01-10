@@ -1,0 +1,8 @@
+// src/services/warmup.js
+export const warmUpBackend = async () => {
+  try {
+    await fetch(import.meta.env.VITE_API_URL + "/health");
+  } catch (e) {
+    console.log("Backend warming up...");
+  }
+};
