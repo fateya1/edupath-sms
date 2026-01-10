@@ -1,25 +1,25 @@
 // frontend/src/services/apiService.js
-export const apiUrl = import.meta.env.VITE_API_URL; // Using the environment variable
+const rawApiUrl = import.meta.env.VITE_API_URL;
 
-// Example login function
+// Make it safe: remove trailing slash if present
+export const apiUrl = (rawApiUrl || "").replace(/\/$/, "");
+
+if (!apiUrl) {
+  console.warn("VITE_API_URL is missing. Set it in Vercel Environment Variables.");
+}
+
 export const login = async (email, password) => {
-  try {
-    const response = await fetch(`${apiUrl}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password }),
-    });
+  const res = await fetch(`${apiUrl}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
 
-    if (!response.ok) {
-      throw new Error('Login failed');
-    }
-
-    const data = await response.json();
-    return data; // return user data or token here
-  } catch (error) {
-    console.error('Error during login:', error);
-    throw error; // You can handle the error as you see fit
+  // If backend returns useful error text, show it
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || "Login failed");
   }
+
+  return res.json();
 };
