@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useBackendWarmup } from "../hooks/useBackendWarmup";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ export default function Login() {
       setLoading(false);
     }
   }
+const { warmingUp } = useBackendWarmup();
 
   return (
     <div style={{ maxWidth: 420, margin: "40px auto" }}>
