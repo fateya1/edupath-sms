@@ -1,25 +1,74 @@
 // frontend/src/services/apiService.js
-const rawApiUrl = import.meta.env.VITE_API_URL;
+export const apiUrl = import.meta.env.VITE_API_URL;
 
-// Make it safe: remove trailing slash if present
-export const apiUrl = (rawApiUrl || "").replace(/\/$/, "");
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-if (!apiUrl) {
-  console.warn("VITE_API_URL is missing. Set it in Vercel Environment Variables.");
+async function fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(t);
+  }
 }
 
-export const login = async (email, password) => {
-  const res = await fetch(`${apiUrl}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
+export async function login(email, password, opts = {}) {
+  const {
+    retries = 3,
+    delayMs = 2500,
+    timeoutMs = 20000,
+  } = opts;
 
-  // If backend returns useful error text, show it
-  if (!res.ok) {
-    const msg = await res.text();
-    throw new Error(msg || "Login failed");
+  let lastErr;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetchWithTimeout(
+        `${apiUrl}/auth/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        },
+        timeoutMs
+      );
+
+      if (!response.ok) {
+        // try parse backend message
+        let msg = "Login failed";
+        try {
+          const data = await response.json();
+          msg = data?.message || msg;
+        } catch {
+          // ignore
+        }
+        throw new Error(msg);
+      }
+
+      return await response.json();
+    } catch (err) {
+      lastErr = err;
+
+      // AbortError or network error often means server sleeping
+      const message =
+        err?.name === "AbortError"
+          ? "Server took too long to respond."
+          : err instanceof Error
+          ? err.message
+          : "Network error.";
+
+      // If we still have retries left, wait and retry
+      if (attempt < retries) {
+        await sleep(delayMs);
+        continue;
+      }
+
+      throw new Error(message);
+    }
   }
 
-  return res.json();
-};
+  throw lastErr || new Error("Login failed.");
+}
