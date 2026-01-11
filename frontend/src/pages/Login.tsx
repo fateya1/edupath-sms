@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useBackendWarmup } from "../hooks/useBackendWarmup";
@@ -7,10 +7,18 @@ export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
+  const { warmingUp, warmupNow } = useBackendWarmup(); // make sure your hook exports warmupNow
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // warm up backend as soon as user opens login page
+  useEffect(() => {
+    warmupNow?.();
+  }, [warmupNow]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -28,11 +36,24 @@ export default function Login() {
       setLoading(false);
     }
   }
-const { warmingUp } = useBackendWarmup();
 
   return (
     <div style={{ maxWidth: 420, margin: "40px auto" }}>
       <h2>Login</h2>
+
+      {warmingUp && (
+        <div
+          style={{
+            background: "#fff4d6",
+            padding: 10,
+            borderRadius: 8,
+            marginBottom: 12,
+            border: "1px solid #ffd27a",
+          }}
+        >
+          Waking up server… please wait a moment.
+        </div>
+      )}
 
       {error && (
         <div
@@ -72,10 +93,10 @@ const { warmingUp } = useBackendWarmup();
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || warmingUp}
           style={{ width: "100%", padding: 10 }}
         >
-          {loading ? "Signing in..." : "Sign in"}
+          {warmingUp ? "Waking up server..." : loading ? "Signing in..." : "Sign in"}
         </button>
       </form>
     </div>
